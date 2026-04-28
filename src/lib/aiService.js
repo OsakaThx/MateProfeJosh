@@ -1,13 +1,14 @@
 /**
  * aiService.js
- * Usa la API de Groq (GRATIS) con el modelo llama-3.1-70b-versatile.
+ * Usa la API de Groq (GRATIS) con el modelo openai/gpt-oss-120b.
+ * Este es el modelo más grande y capaz disponible actualmente en Groq.
  * Obtén tu clave gratuita en: https://console.groq.com/keys
  * La clave se guarda SOLO en localStorage del navegador.
  */
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-// Usamos llama-3.1-70b que es estable y bueno para matemáticas
-const GROQ_MODEL = 'llama-3.1-70b-versatile';
+// GPT OSS 120B - modelo más grande disponible, excelente para matemáticas precisas
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 const DELAY_MS = 600; // ms entre peticiones para no exceder TPM
 
 function sleep(ms) {
