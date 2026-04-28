@@ -26,6 +26,56 @@ NUNCA pongas LaTeX fuera de los signos $...$`;
 
 const JSON_EXAMPLE = `{"problem":"Calcula $f(2)$ si $f(x) = 3x - 1$","answer":"5","answerLatex":"5","steps":["Sustituir $x = 2$: $f(2) = 3(2) - 1$","Calcular: $6 - 1 = 5$","Resultado: $f(2) = 5$"],"difficulty":"básico","type":"open"}`;
 
+const FUNCIONES_SUBTOPICS = [
+  'evaluación de f(x) con un número positivo',
+  'evaluación de f(x) con un número negativo',
+  'evaluación de f(x) con x=0',
+  'composición f(g(x)) paso a paso',
+  'función cuadrática evaluada en un punto',
+  'función con fracción evaluada en un punto',
+  'suma de dos evaluaciones f(a)+f(b)',
+];
+const DOMINIO_SUBTOPICS = [
+  'función racional simple 1/(x-k)',
+  'función con raíz cuadrada √(x+k)',
+  'función racional con numerador constante',
+  'función con raíz √(ax+b)',
+  'función racional con denominador cuadrático',
+  'polinomio (dominio todos los reales)',
+  'función racional 1/(x²-k²)',
+];
+const NOTABLES_SUBTOPICS = [
+  'expandir cuadrado de binomio (a+b)²',
+  'expandir cuadrado de binomio (a-b)²',
+  'factorizar diferencia de cuadrados a²-b²',
+  'expandir producto (a+b)(a-b)',
+  'expandir con coeficientes: (2x+k)²',
+  'factorizar diferencia de cuadrados con coeficiente',
+  'expandir cubo de binomio (a+b)³',
+];
+const FACTORIZACION_SUBTOPICS = [
+  'factor común monomio',
+  'trinomio x²+bx+c con raíces enteras positivas',
+  'trinomio x²+bx+c con una raíz negativa',
+  'factor común + diferencia de cuadrados',
+  'trinomio cuadrado perfecto',
+  'diferencia de cubos',
+  'suma de cubos',
+];
+const FORMULA_SUBTOPICS = [
+  'ecuación con dos raíces enteras distintas',
+  'ecuación con raíz doble (discriminante=0)',
+  'ecuación con raíces fraccionarias',
+  'ecuación con coeficiente a=2',
+  'ecuación con coeficiente a=3',
+  'ecuación sin término lineal (b=0)',
+  'ecuación sin discriminante negativo (sin solución real)',
+];
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 /**
  * Sanitiza texto para corregir LaTeX mal formateado del modelo.
  * Envuelve expresiones matemáticas sueltas en $...$
@@ -58,47 +108,66 @@ function sanitizeProblem(obj) {
 const TOPIC_PROMPTS = {
   funciones: {
     label: 'Funciones',
-    userPrompt: (diff) => `Genera UN problema SENCILLO Y CLARO sobre funciones. Nivel: ${diff}.
-Ejemplo de BUEN problema: "Dada la función $f(x) = 2x + 3$, calcula $f(4)$."
-Evita funciones complicadas como f(g(x)) anidadas a menos que sea nivel avanzado.
-Devuelve EXACTAMENTE este JSON (reemplaza los valores, respeta las $ en LaTeX):
-${JSON_EXAMPLE}`,
+    userPrompt: (diff) => {
+      const sub = pickRandom(FUNCIONES_SUBTOPICS);
+      const n1 = Math.floor(Math.random()*8)+1;
+      const n2 = Math.floor(Math.random()*8)+2;
+      return `Genera UN problema ORIGINAL de funciones. Tipo específico: "${sub}". Nivel: ${diff}.
+IMPORTANTE: Usa números distintos a ejemplos previos. Sugerencia de coeficientes: usa ${n1} y ${n2}.
+El problema debe ser diferente a "f(x)=3x-1" y "f(x)=2x+3".
+Devuelve EXACTAMENTE este JSON (reemplaza los valores, usa $ en LaTeX):
+${JSON_EXAMPLE}`;
+    },
   },
   dominio_rango: {
     label: 'Dominio y Rango',
-    userPrompt: (diff) => `Genera UN problema sobre dominio de una función. Nivel: ${diff}.
-Nivel básico: solo una restricción simple. Ejemplo: "Encuentra el dominio de $f(x) = \\frac{1}{x-3}$."
-Nivel intermedio: raíz cuadrada. Ejemplo: "Encuentra el dominio de $g(x) = \\sqrt{x+5}$."
-Nivel avanzado: combinación de raíz y denominador.
-Devuelve EXACTAMENTE este JSON (reemplaza los valores, respeta las $ en LaTeX):
-${JSON_EXAMPLE}`,
+    userPrompt: (diff) => {
+      const sub = pickRandom(DOMINIO_SUBTOPICS);
+      const k = Math.floor(Math.random()*9)+1;
+      return `Genera UN problema ORIGINAL de dominio de funciones. Tipo: "${sub}". Nivel: ${diff}.
+IMPORTANTE: Usa una constante diferente, sugiero k=${k}. El resultado debe ser un intervalo específico.
+Devuelve EXACTAMENTE este JSON (reemplaza los valores, usa $ en LaTeX):
+${JSON_EXAMPLE}`;
+    },
   },
   formulas_notables: {
     label: 'Fórmulas Notables',
-    userPrompt: (diff) => `Genera UN problema de productos notables. Nivel: ${diff}.
-Ejemplo básico: "Expande $(x + 5)^2$" → respuesta: "$x^2 + 10x + 25$"
-Ejemplo medio: "Factoriza $x^2 - 16$" → respuesta: "$(x+4)(x-4)$"
-NUNCA uses variables complejas, usa siempre x, a, b simples.
-Devuelve EXACTAMENTE este JSON (reemplaza los valores, respeta las $ en LaTeX):
-${JSON_EXAMPLE}`,
+    userPrompt: (diff) => {
+      const sub = pickRandom(NOTABLES_SUBTOPICS);
+      const k = Math.floor(Math.random()*8)+2;
+      return `Genera UN problema ORIGINAL de productos notables. Tipo: "${sub}". Nivel: ${diff}.
+IMPORTANTE: Usa constante ${k}. NO generes "x²+7x+12" ni "(x+3)(x+4)" — busca valores distintos.
+Usa solo la variable x y coeficientes simples.
+Devuelve EXACTAMENTE este JSON (reemplaza los valores, usa $ en LaTeX):
+${JSON_EXAMPLE}`;
+    },
   },
   factorizacion: {
     label: 'Factorización',
-    userPrompt: (diff) => `Genera UN problema de factorización. Nivel: ${diff}.
-Ejemplo básico: "Factoriza $x^2 + 5x + 6$" → respuesta: "$(x+2)(x+3)$"
-Ejemplo medio: "Factoriza $2x^2 - 8$" → respuesta: "$2(x+2)(x-2)$"
-Siempre usa polinomios con coeficientes enteros pequeños (máximo 10).
-Devuelve EXACTAMENTE este JSON (reemplaza los valores, respeta las $ en LaTeX):
-${JSON_EXAMPLE}`,
+    userPrompt: (diff) => {
+      const sub = pickRandom(FACTORIZACION_SUBTOPICS);
+      const r1 = Math.floor(Math.random()*6)+1;
+      const r2 = Math.floor(Math.random()*6)+2;
+      return `Genera UN problema ORIGINAL de factorización. Tipo: "${sub}". Nivel: ${diff}.
+IMPORTANTE: Construye el trinomio con raíces ${r1} y ${r2} (o sus negativos según el tipo). NO repitas x²+7x+12.
+Usa coeficientes enteros menores a 10.
+Devuelve EXACTAMENTE este JSON (reemplaza los valores, usa $ en LaTeX):
+${JSON_EXAMPLE}`;
+    },
   },
   formula_general: {
     label: 'Fórmula General',
-    userPrompt: (diff) => `Genera UN problema de ecuación cuadrática $ax^2+bx+c=0$. Nivel: ${diff}.
-Ejemplo básico: "Resuelve $x^2 - 5x + 6 = 0$" → respuesta: "$x = 2$ ó $x = 3$"
-Ejemplo medio: "Resuelve $2x^2 + x - 3 = 0$"
-Usa coeficientes enteros simples. El enunciado debe ser en español claro.
-Devuelve EXACTAMENTE este JSON (reemplaza los valores, respeta las $ en LaTeX):
-${JSON_EXAMPLE}`,
+    userPrompt: (diff) => {
+      const sub = pickRandom(FORMULA_SUBTOPICS);
+      const a = pickRandom([1,1,1,2,3]);
+      const r1 = Math.floor(Math.random()*6)-2;
+      const r2 = Math.floor(Math.random()*6)+1;
+      return `Genera UN problema ORIGINAL de ecuación cuadrática. Tipo: "${sub}". Nivel: ${diff}.
+IMPORTANTE: Construye la ecuación con $a=${a}$ y raíces ${r1} y ${r2}. NO uses x²-5x+6=0.
+El enunciado debe decir "Resuelve usando la fórmula general: ...".
+Devuelve EXACTAMENTE este JSON (reemplaza los valores, usa $ en LaTeX):
+${JSON_EXAMPLE}`;
+    },
   },
 };
 
@@ -117,7 +186,7 @@ async function callGroq(messages, apiKey, retries = 2) {
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages,
-        temperature: 0.7,
+        temperature: 0.9,
         max_tokens: 512,
         response_format: { type: 'json_object' },
       }),
