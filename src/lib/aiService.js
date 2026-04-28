@@ -14,41 +14,91 @@ function sleep(ms) {
 }
 
 const SYSTEM_BASE = `Eres MateProfe, tutor de pre-cálculo. Respondes SIEMPRE en español.
-RESPONDE ÚNICAMENTE con un objeto JSON válido, sin texto antes ni después, sin bloques de código markdown.
-Usa LaTeX solo dentro de los valores del JSON, entre $ (inline).`;
+RESPONDE ÚNICAMENTE con un objeto JSON válido, sin texto antes ni después, sin markdown.
+REGLA CRÍTICA DE LATEX: Toda expresión matemática DEBE ir entre signos de dólar.
+CORRECTO: "Calcula $f(3)$ si $f(x) = 2x + 1$"
+INCORRECTO: "Calcula f(3) si f(x) = 2x + 1"
+CORRECTO en steps: "Sustituir $x = 3$: $f(3) = 2(3)+1 = 7$"
+INCORRECTO en steps: "Sustituir x = 3: f(3) = 2(3)+1 = 7"
+NUNCA uses \rac{} — SIEMPRE usa \frac{}{}
+NUNCA uses \sqrt sin llaves — SIEMPRE usa \sqrt{}
+NUNCA pongas LaTeX fuera de los signos $...$`;
 
-const JSON_SHAPE = `{"problem":"enunciado en español","answer":"respuesta","answerLatex":"LaTeX","steps":["paso 1","paso 2","paso 3"],"difficulty":"básico","type":"open"}`;
+const JSON_EXAMPLE = `{"problem":"Calcula $f(2)$ si $f(x) = 3x - 1$","answer":"5","answerLatex":"5","steps":["Sustituir $x = 2$: $f(2) = 3(2) - 1$","Calcular: $6 - 1 = 5$","Resultado: $f(2) = 5$"],"difficulty":"básico","type":"open"}`;
+
+/**
+ * Sanitiza texto para corregir LaTeX mal formateado del modelo.
+ * Envuelve expresiones matemáticas sueltas en $...$
+ */
+function sanitizeProblem(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const fix = (str) => {
+    if (!str || typeof str !== 'string') return str;
+    // Fix \frac sin $ → agregar $
+    let s = str.replace(/(^|[^$])(\\frac\{[^}]+\}\{[^}]+\})/g, '$1$$$2$$');
+    // Fix \sqrt sin $
+    s = s.replace(/(^|[^$])(\\sqrt\{[^}]+\})/g, '$1$$$2$$');
+    // Fix \rac → \frac
+    s = s.replace(/\\rac\{/g, '\\frac{');
+    // Fix LaTeX commands sueltos sin $ (ej: x^2, x_1)
+    s = s.replace(/(^|[\s(])([a-zA-Z]\^\d)([\s),]|$)/g, '$1$$$2$$$3');
+    // Doble $$ accidentales → $
+    s = s.replace(/\$\$([^$]+)\$\$/g, '\$$1\$');
+    return s;
+  };
+  return {
+    ...obj,
+    problem: fix(obj.problem),
+    answer: obj.answer,
+    answerLatex: obj.answerLatex,
+    steps: Array.isArray(obj.steps) ? obj.steps.map(fix) : obj.steps,
+  };
+}
 
 const TOPIC_PROMPTS = {
   funciones: {
     label: 'Funciones',
-    userPrompt: (diff) => `Genera UN problema de pre-cálculo sobre funciones (evaluación f(x), composición, o identificar función). Dificultad: ${diff}.
-Devuelve ÚNICAMENTE este JSON (sin texto extra, sin markdown):
-${JSON_SHAPE}`,
+    userPrompt: (diff) => `Genera UN problema SENCILLO Y CLARO sobre funciones. Nivel: ${diff}.
+Ejemplo de BUEN problema: "Dada la función $f(x) = 2x + 3$, calcula $f(4)$."
+Evita funciones complicadas como f(g(x)) anidadas a menos que sea nivel avanzado.
+Devuelve EXACTAMENTE este JSON (reemplaza los valores, respeta las $ en LaTeX):
+${JSON_EXAMPLE}`,
   },
   dominio_rango: {
     label: 'Dominio y Rango',
-    userPrompt: (diff) => `Genera UN problema sobre dominio de una función (racional, con raíz o logarítmica). Dificultad: ${diff}.
-Devuelve ÚNICAMENTE este JSON (sin texto extra, sin markdown):
-${JSON_SHAPE}`,
+    userPrompt: (diff) => `Genera UN problema sobre dominio de una función. Nivel: ${diff}.
+Nivel básico: solo una restricción simple. Ejemplo: "Encuentra el dominio de $f(x) = \\frac{1}{x-3}$."
+Nivel intermedio: raíz cuadrada. Ejemplo: "Encuentra el dominio de $g(x) = \\sqrt{x+5}$."
+Nivel avanzado: combinación de raíz y denominador.
+Devuelve EXACTAMENTE este JSON (reemplaza los valores, respeta las $ en LaTeX):
+${JSON_EXAMPLE}`,
   },
   formulas_notables: {
     label: 'Fórmulas Notables',
-    userPrompt: (diff) => `Genera UN problema de productos notables (expandir o factorizar: cuadrado binomio, diferencia cuadrados, cubos). Dificultad: ${diff}.
-Devuelve ÚNICAMENTE este JSON (sin texto extra, sin markdown):
-${JSON_SHAPE}`,
+    userPrompt: (diff) => `Genera UN problema de productos notables. Nivel: ${diff}.
+Ejemplo básico: "Expande $(x + 5)^2$" → respuesta: "$x^2 + 10x + 25$"
+Ejemplo medio: "Factoriza $x^2 - 16$" → respuesta: "$(x+4)(x-4)$"
+NUNCA uses variables complejas, usa siempre x, a, b simples.
+Devuelve EXACTAMENTE este JSON (reemplaza los valores, respeta las $ en LaTeX):
+${JSON_EXAMPLE}`,
   },
   factorizacion: {
     label: 'Factorización',
-    userPrompt: (diff) => `Genera UN problema de factorización de polinomios (factor común, diferencia cuadrados, suma/diferencia cubos, o trinomio). Dificultad: ${diff}.
-Devuelve ÚNICAMENTE este JSON (sin texto extra, sin markdown):
-${JSON_SHAPE}`,
+    userPrompt: (diff) => `Genera UN problema de factorización. Nivel: ${diff}.
+Ejemplo básico: "Factoriza $x^2 + 5x + 6$" → respuesta: "$(x+2)(x+3)$"
+Ejemplo medio: "Factoriza $2x^2 - 8$" → respuesta: "$2(x+2)(x-2)$"
+Siempre usa polinomios con coeficientes enteros pequeños (máximo 10).
+Devuelve EXACTAMENTE este JSON (reemplaza los valores, respeta las $ en LaTeX):
+${JSON_EXAMPLE}`,
   },
   formula_general: {
     label: 'Fórmula General',
-    userPrompt: (diff) => `Genera UN problema de ecuación cuadrática ax²+bx+c=0 para resolver con la fórmula general. Dificultad: ${diff}.
-Devuelve ÚNICAMENTE este JSON (sin texto extra, sin markdown):
-${JSON_SHAPE}`,
+    userPrompt: (diff) => `Genera UN problema de ecuación cuadrática $ax^2+bx+c=0$. Nivel: ${diff}.
+Ejemplo básico: "Resuelve $x^2 - 5x + 6 = 0$" → respuesta: "$x = 2$ ó $x = 3$"
+Ejemplo medio: "Resuelve $2x^2 + x - 3 = 0$"
+Usa coeficientes enteros simples. El enunciado debe ser en español claro.
+Devuelve EXACTAMENTE este JSON (reemplaza los valores, respeta las $ en LaTeX):
+${JSON_EXAMPLE}`,
   },
 };
 
@@ -113,7 +163,7 @@ export async function generateProblem(topicKey, difficulty = 'aleatorio') {
 
   const raw = await callGroq(messages, apiKey);
   const parsed = JSON.parse(raw);
-  return { ...parsed, topic: topicKey, topicLabel: topic.label };
+  return { ...sanitizeProblem(parsed), topic: topicKey, topicLabel: topic.label };
 }
 
 /**
