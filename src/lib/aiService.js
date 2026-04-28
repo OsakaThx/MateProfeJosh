@@ -120,64 +120,96 @@ const TOPIC_PROMPTS = {
   funciones: {
     label: 'Funciones',
     userPrompt: (diff) => {
-      const sub = pickRandom(FUNCIONES_SUBTOPICS);
-      const n1 = Math.floor(Math.random()*8)+1;
-      const n2 = Math.floor(Math.random()*8)+2;
-      return `Genera UN problema ORIGINAL de funciones. Tipo específico: "${sub}". Nivel: ${diff}.
-IMPORTANTE: Usa números distintos a ejemplos previos. Sugerencia de coeficientes: usa ${n1} y ${n2}.
-El problema debe ser diferente a "f(x)=3x-1" y "f(x)=2x+3".
-Devuelve EXACTAMENTE este JSON (reemplaza los valores, usa $ en LaTeX):
-${JSON_EXAMPLE}`;
+      const a = Math.floor(Math.random()*5)+1; // 1-5
+      const b = Math.floor(Math.random()*5)+1; // 1-5
+      const c = Math.floor(Math.random()*5); // 0-4
+      const x = Math.floor(Math.random()*5)+2; // 2-6
+      return `Crea UN problema simple de evaluar funcion.
+
+Reglas:
+- Usa solo numeros pequenos: ${a}, ${b}, ${c}
+- Evalua en x = ${x}
+- Formato: "Calcula f(${x}) si f(x) = ${a}x^2 + ${b}x + ${c}"
+- Responde EXACTAMENTE:
+
+PROBLEMA: Calcula $f(${x})$ si $f(x) = ${a}x^2 + ${b}x + ${c}$
+TIPO: funciones
+DIFICULTAD: ${diff}`;
     },
   },
   dominio_rango: {
     label: 'Dominio y Rango',
     userPrompt: (diff) => {
-      const sub = pickRandom(DOMINIO_SUBTOPICS);
-      const k = Math.floor(Math.random()*9)+1;
-      return `Genera UN problema ORIGINAL de dominio de funciones. Tipo: "${sub}". Nivel: ${diff}.
-IMPORTANTE: Usa una constante diferente, sugiero k=${k}. El resultado debe ser un intervalo específico.
-Devuelve EXACTAMENTE este JSON (reemplaza los valores, usa $ en LaTeX):
-${JSON_EXAMPLE}`;
+      const k = Math.floor(Math.random()*8)+2; // 2-9
+      return `Crea UN problema simple de hallar dominio.
+
+Reglas:
+- Usa numero simple: ${k}
+- Formato: "Hallar el dominio de f(x) = 1/(x - ${k})"
+- O usa raiz: "Hallar el dominio de f(x) = sqrt(x - ${k})"
+- Responde EXACTAMENTE:
+
+PROBLEMA: Hallar el dominio de $f(x) = \\frac{1}{x - ${k}}$
+TIPO: dominio_rango
+DIFICULTAD: ${diff}`;
     },
   },
   formulas_notables: {
     label: 'Fórmulas Notables',
     userPrompt: (diff) => {
-      const sub = pickRandom(NOTABLES_SUBTOPICS);
-      const k = Math.floor(Math.random()*8)+2;
-      return `Genera UN problema ORIGINAL de productos notables. Tipo: "${sub}". Nivel: ${diff}.
-IMPORTANTE: Usa constante ${k}. NO generes "x²+7x+12" ni "(x+3)(x+4)" — busca valores distintos.
-Usa solo la variable x y coeficientes simples.
-Devuelve EXACTAMENTE este JSON (reemplaza los valores, usa $ en LaTeX):
-${JSON_EXAMPLE}`;
+      const a = Math.floor(Math.random()*3)+2; // 2-4
+      const b = Math.floor(Math.random()*5)+2; // 2-6
+      return `Crea UN problema simple de expandir binomio.
+
+Reglas:
+- Usa solo numeros pequenos
+- Formato: "Expande (ax + b)^2" con a=${a}, b=${b}
+- Ejemplo: "Expande (${a}x + ${b})^2"
+- Responde EXACTAMENTE:
+
+PROBLEMA: Expande $(${a}x + ${b})^2$
+TIPO: formulas_notables
+DIFICULTAD: ${diff}`;
     },
   },
   factorizacion: {
     label: 'Factorización',
     userPrompt: (diff) => {
-      const sub = pickRandom(FACTORIZACION_SUBTOPICS);
-      const r1 = Math.floor(Math.random()*6)+1;
-      const r2 = Math.floor(Math.random()*6)+2;
-      return `Genera UN problema ORIGINAL de factorización. Tipo: "${sub}". Nivel: ${diff}.
-IMPORTANTE: Construye el trinomio con raíces ${r1} y ${r2} (o sus negativos según el tipo). NO repitas x²+7x+12.
-Usa coeficientes enteros menores a 10.
-Devuelve EXACTAMENTE este JSON (reemplaza los valores, usa $ en LaTeX):
-${JSON_EXAMPLE}`;
+      const p = Math.floor(Math.random()*4)+2; // 2-5
+      const q = Math.floor(Math.random()*4)+3; // 3-6
+      const sum = p + q;
+      const prod = p * q;
+      return `Crea UN problema simple de factorizar trinomio.
+
+Reglas:
+- Usa raices ${p} y ${q}
+- Formato: "Factoriza x^2 - ${sum}x + ${prod}"
+- Responde EXACTAMENTE:
+
+PROBLEMA: Factoriza $x^2 - ${sum}x + ${prod}$
+TIPO: factorizacion
+DIFICULTAD: ${diff}`;
     },
   },
   formula_general: {
     label: 'Fórmula General',
     userPrompt: (diff) => {
-      const sub = pickRandom(FORMULA_SUBTOPICS);
-      const a = pickRandom([1,1,1,2,3]);
-      const r1 = Math.floor(Math.random()*6)-2;
-      const r2 = Math.floor(Math.random()*6)+1;
-      return `Genera UN problema ORIGINAL de ecuación cuadrática. Tipo: "${sub}". Nivel: ${diff}.
-IMPORTANTE: Construye la ecuación con $a=${a}$ y raíces ${r1} y ${r2}. NO uses x²-5x+6=0.
-El enunciado debe decir "Resuelve usando la fórmula general: ...".
-Devuelve EXACTAMENTE este JSON (reemplaza los valores, usa $ en LaTeX):
-${JSON_EXAMPLE}`;
+      const a = 1;
+      const r1 = Math.floor(Math.random()*4)+1; // 1-4
+      const r2 = Math.floor(Math.random()*4)+5; // 5-8
+      const sum = r1 + r2;
+      const prod = r1 * r2;
+      return `Crea UN problema simple de ecuacion cuadratica.
+
+Reglas:
+- Raices: ${r1} y ${r2}
+- Ecuacion: x^2 - ${sum}x + ${prod} = 0
+- Formato: "Resuelve x^2 - ${sum}x + ${prod} = 0"
+- Responde EXACTAMENTE:
+
+PROBLEMA: Resuelve $x^2 - ${sum}x + ${prod} = 0$
+TIPO: formula_general
+DIFICULTAD: ${diff}`;
     },
   },
 };
@@ -231,30 +263,55 @@ async function callGroq(messages, apiKey, retries = 2) {
  */
 function calculatePrecalculusAnswer(problemText, topicKey) {
   try {
+    // Clean the problem text first
+    const clean = problemText.replace(/\$\$/g, '$').replace(/\s+/g, ' ').trim();
+    
     // Extract function expression if present
-    const funcMatch = problemText.match(/f\(x\)\s*=\s*([^.,;\n]+)/i);
-    const evalMatch = problemText.match(/f\(\s*(\d+)\s*\)/i);
+    // Match patterns like: f(x) = 2x^2 + 3x - 1 OR f(x)=2x^2+3x-1
+    const funcMatch = clean.match(/f\(x\)\s*=\s*([^.,;]+?)(?=\s*\)|\s*$|Evaluar|Calcular)/i);
+    // Match evaluation point: f(3), f(4), etc
+    const evalMatch = clean.match(/[fc]\(\s*(\d+)\s*\)/i);
     
     if (funcMatch && evalMatch && topicKey === 'funciones') {
-      const expr = funcMatch[1].trim();
+      let expr = funcMatch[1].trim();
       const xVal = evalMatch[1];
-      // Substitute and evaluate
+      
+      // Clean up the expression: remove LaTeX artifacts
+      expr = expr.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)');
+      expr = expr.replace(/\\sqrt\{([^}]+)\}/g, 'sqrt($1)');
+      
+      // Substitute x with value
       const substituted = expr.replace(/\bx\b/g, `(${xVal})`);
+      
       try {
         const result = nerdamer(substituted).evaluate().text();
+        // Format as nice number
+        const numResult = parseFloat(result);
+        if (!isNaN(numResult) && Number.isInteger(numResult)) {
+          return { answer: String(numResult), answerLatex: String(numResult) };
+        }
         return { answer: result, answerLatex: result };
       } catch {
+        // Manual calculation fallback
+        try {
+          const val = eval(substituted.replace(/\^/g, '**'));
+          if (Number.isFinite(val)) {
+            return { answer: String(Math.round(val * 100) / 100), answerLatex: String(Math.round(val * 100) / 100) };
+          }
+        } catch {}
         return null;
       }
     }
     
-    // For quadratic equations, solve with formula
-    const quadMatch = problemText.match(/(\d*)x\^2\s*([+-])\s*(\d*)x\s*([+-])\s*(\d+)/i);
+    // For quadratic equations: x^2 - 7x + 12 = 0
+    // Match various formats: x^2-7x+12, x^2 - 7x + 12, etc
+    const quadMatch = clean.match(/(\d*)\s*[*]?x\^2\s*([+-])\s*(\d*)\s*[*]?x\s*([+-])\s*(\d+)/i);
     if (quadMatch && topicKey === 'formula_general') {
       let a = quadMatch[1] ? parseInt(quadMatch[1]) : 1;
-      if (quadMatch[2] === '-') a = -a;
-      const b = parseInt(quadMatch[3]) || 0;
-      const c = parseInt(quadMatch[4]) || 0;
+      const bSign = quadMatch[2] === '-' ? -1 : 1;
+      const b = (parseInt(quadMatch[3]) || 0) * bSign;
+      const cSign = quadMatch[4] === '-' ? -1 : 1;
+      const c = (parseInt(quadMatch[5]) || 0) * cSign;
       
       const discriminant = b*b - 4*a*c;
       if (discriminant < 0) return { answer: 'no tiene raices reales', answerLatex: '\\text{No tiene raíces reales}' };
@@ -263,10 +320,62 @@ function calculatePrecalculusAnswer(problemText, topicKey) {
       const x1 = (-b + sqrtD) / (2*a);
       const x2 = (-b - sqrtD) / (2*a);
       
+      const fmt = (n) => {
+        const rounded = Math.round(n * 100) / 100;
+        return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(2).replace(/\.?0+$/, '');
+      };
+      
       if (Math.abs(x1 - x2) < 0.0001) {
-        return { answer: `x=${x1.toFixed(2).replace(/\.00$/, '')}`, answerLatex: `x = ${x1.toFixed(2).replace(/\.00$/, '')}` };
+        return { answer: `x=${fmt(x1)}`, answerLatex: `x = ${fmt(x1)}` };
       }
-      return { answer: `x=${x1.toFixed(2).replace(/\.00$/, '')} o x=${x2.toFixed(2).replace(/\.00$/, '')}`, answerLatex: `x = ${x1.toFixed(2).replace(/\.00$/, '')} \\text{ ó } x = ${x2.toFixed(2).replace(/\.00$/, '')}` };
+      return { answer: `x=${fmt(x1)} o x=${fmt(x2)}`, answerLatex: `x = ${fmt(x1)} \\text{ ó } x = ${fmt(x2)}` };
+    }
+    
+    // For binomial expansion: (ax + b)^2
+    const binomMatch = clean.match(/\(\s*(\d*)\s*x\s*([+-])\s*(\d+)\s*\)\^2/);
+    if (binomMatch && topicKey === 'formulas_notables') {
+      const a = parseInt(binomMatch[1]) || 1;
+      const bSign = binomMatch[2] === '-' ? -1 : 1;
+      const b = parseInt(binomMatch[3]) * bSign;
+      // (ax+b)^2 = a^2x^2 + 2abx + b^2
+      const a2 = a*a;
+      const ab2 = 2*a*b;
+      const b2 = b*b;
+      
+      const terms = [];
+      if (a2 !== 0) terms.push(`${a2}x^2`);
+      if (ab2 > 0) terms.push(`+${ab2}x`);
+      else if (ab2 < 0) terms.push(`${ab2}x`);
+      if (b2 > 0) terms.push(`+${b2}`);
+      else if (b2 < 0) terms.push(`${b2}`);
+      
+      const answer = terms.join('').replace(/^\+/, '');
+      return { answer, answerLatex: answer };
+    }
+    
+    // For factorization: x^2 - 7x + 12
+    const factorMatch = clean.match(/x\^2\s*([+-])\s*(\d+)x\s*([+-])\s*(\d+)/i);
+    if (factorMatch && topicKey === 'factorizacion') {
+      const bSign = factorMatch[1] === '-' ? -1 : 1;
+      const b = parseInt(factorMatch[2]) * bSign;
+      const cSign = factorMatch[3] === '-' ? -1 : 1;
+      const c = parseInt(factorMatch[4]) * cSign;
+      
+      // Find factors of c that add up to b
+      for (let i = -Math.abs(c); i <= Math.abs(c); i++) {
+        if (i === 0) continue;
+        if (c % i === 0) {
+          const j = c / i;
+          if (i + j === b) {
+            const sign1 = i < 0 ? '-' : '+';
+            const sign2 = j < 0 ? '-' : '+';
+            const ai = Math.abs(i);
+            const aj = Math.abs(j);
+            const answer = `(x${sign1}${ai})(x${sign2}${aj})`;
+            return { answer, answerLatex: answer };
+          }
+        }
+      }
     }
     
     return null;
@@ -309,9 +418,40 @@ DIFICULTAD: básico`
 
   const raw = await callGroq(messages, apiKey);
   
-  // Parse the text format
-  const problemMatch = raw.match(/PROBLEMA:\s*([\s\S]+?)\nTIPO:/i);
-  const problemText = problemMatch ? problemMatch[1].trim() : raw.trim();
+  // AGGRESSIVE CLEANING: Fix AI broken output with newlines between chars
+  function cleanAiText(text) {
+    if (!text) return '';
+    
+    // Remove nulls and control chars
+    text = text.replace(/[\x00-\x08\x0b-\x0c\x0e-\x1f]/g, '');
+    
+    // Fix the most common AI bug: single chars on separate lines like "f\n(\n3\n)"
+    // Join lines that are single non-space characters
+    text = text.replace(/^(\S)\s*$/gm, '$1');
+    text = text.replace(/(\S)\n+(?=\S)/g, '$1');
+    
+    // Remove all newlines within LaTeX expressions ($...$)
+    text = text.replace(/\$([^$]*)\n+([^$]*)\$/g, '$$1$2$');
+    
+    // Collapse all whitespace to single spaces
+    text = text.replace(/\s+/g, ' ');
+    
+    // Fix broken LaTeX commands
+    text = text.replace(/\\\s+/g, '\\');
+    
+    // Remove garbage quotes and escapes
+    text = text.replace(/\\{3,}/g, '');
+    text = text.replace(/["]{2,}/g, '"');
+    text = text.replace(/'\s*'/g, '');
+    
+    return text.trim();
+  }
+  
+  const cleanedRaw = cleanAiText(raw);
+  
+  // Parse the text format - be very flexible
+  const problemMatch = cleanedRaw.match(/PROBLEMA[:\s]+([\s\S]+?)(?:\nTIPO:|$)/i);
+  const problemText = problemMatch ? problemMatch[1].trim() : cleanedRaw.trim();
   
   // Calculate correct answer using Nerdamer (not AI!)
   const calculated = calculatePrecalculusAnswer(problemText, topicKey);
