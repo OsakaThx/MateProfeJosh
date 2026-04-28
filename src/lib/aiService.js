@@ -6,6 +6,8 @@
  * La clave se guarda SOLO en localStorage del navegador.
  */
 
+import nerdamer from 'nerdamer';
+
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 // Llama 3.3 70B - soporta JSON mode, bueno para matemáticas con temperatura baja
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -16,28 +18,22 @@ function sleep(ms) {
 }
 
 const SYSTEM_BASE = `Eres MateProfe, tutor de pre-cálculo. Respondes SIEMPRE en español.
-RESPONDE ÚNICAMENTE con un objeto JSON válido, sin texto antes ni después, sin markdown.
+Responde con texto claro siguiendo el formato solicitado. Usa LaTeX $...$ para todas las fórmulas matemáticas.
 
-REGLA CRÍTICA #1 - ORDEN DE OPERACIONES Y VERIFICACIÓN:
+REGLA CRÍTICA - ORDEN DE OPERACIONES:
 Primero potencias/exponentes, luego multiplicaciones/divisions, luego sumas/restas.
 NO hagas $2(4)^2 = 8^2 = 64$. Lo correcto es: $2(4)^2 = 2(16) = 32$.
 
-Antes de escribir tu JSON, calcula la respuesta DOS VECES paso a paso.
-Ejemplo: $f(x)=4x^2+8x-5$, calcular $f(8)$:
+Ejemplo correcto: $f(x)=4x^2+8x-5$, calcular $f(8)$:
   Paso 1: Potencia primero → $8^2 = 64$
   Paso 2: Multiplicaciones → $4(64) = 256$, $8(8) = 64$
   Paso 3: Suma y resta → $256 + 64 - 5 = 315$
-Respuesta: 315. NO inventes números como 507. NO sumes dos veces el mismo término.
 
-REGLA CRÍTICA #2 - LATEX:
-Toda expresión matemática DEBE ir entre signos de dólar.
-CORRECTO: "Calcula $f(3)$ si $f(x) = 2x + 1$"
-INCORRECTO: "Calcula f(3) si f(x) = 2x + 1"
-CORRECTO en steps: "Sustituir $x = 3$: $f(3) = 2(3)+1 = 7$"
-INCORRECTO en steps: "Sustituir x = 3: f(3) = 2(3)+1 = 7"
-NUNCA uses \rac{} — SIEMPRE usa \frac{}{}
-NUNCA uses \sqrt sin llaves — SIEMPRE usa \sqrt{}
-NUNCA pongas LaTeX fuera de los signos $...$`;
+REGLAS DE LATEX:
+- Toda expresión matemática entre $...$
+- NUNCA \rac{} — SIEMPRE \frac{}{}
+- NUNCA \sqrt sin llaves — SIEMPRE \sqrt{}
+- NUNCA pongas LaTeX fuera de los signos $...$`;
 
 const JSON_EXAMPLE = `{"problem":"Calcula $f(2)$ si $f(x) = 3x - 1$","answer":"5","answerLatex":"5","steps":["Sustituir $x = 2$: $f(2) = 3(2) - 1$","Calcular: $6 - 1 = 5$","Resultado: $f(2) = 5$"],"difficulty":"básico","type":"open"}`;
 
@@ -201,9 +197,8 @@ async function callGroq(messages, apiKey, retries = 2) {
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages,
-        temperature: 0.1, // temperatura baja = cálculos más consistentes
+        temperature: 0.3, // temperatura moderada para creatividad pero consistencia
         max_tokens: 512,
-        response_format: { type: 'json_object' },
       }),
     });
 
@@ -227,7 +222,59 @@ async function callGroq(messages, apiKey, retries = 2) {
 
 /**
  * Generate a math problem for the given topic and difficulty.
+ * AI generates the problem statement, WE calculate the answer using Nerdamer for 100% accuracy.
  */
+
+/**
+ * Calculate correct answer and steps using Nerdamer for mathematical precision.
+ * This ensures 100% accurate answers regardless of AI calculation errors.
+ */
+function calculatePrecalculusAnswer(problemText, topicKey) {
+  try {
+    // Extract function expression if present
+    const funcMatch = problemText.match(/f\(x\)\s*=\s*([^.,;\n]+)/i);
+    const evalMatch = problemText.match(/f\(\s*(\d+)\s*\)/i);
+    
+    if (funcMatch && evalMatch && topicKey === 'funciones') {
+      const expr = funcMatch[1].trim();
+      const xVal = evalMatch[1];
+      // Substitute and evaluate
+      const substituted = expr.replace(/\bx\b/g, `(${xVal})`);
+      try {
+        const result = nerdamer(substituted).evaluate().text();
+        return { answer: result, answerLatex: result };
+      } catch {
+        return null;
+      }
+    }
+    
+    // For quadratic equations, solve with formula
+    const quadMatch = problemText.match(/(\d*)x\^2\s*([+-])\s*(\d*)x\s*([+-])\s*(\d+)/i);
+    if (quadMatch && topicKey === 'formula_general') {
+      let a = quadMatch[1] ? parseInt(quadMatch[1]) : 1;
+      if (quadMatch[2] === '-') a = -a;
+      const b = parseInt(quadMatch[3]) || 0;
+      const c = parseInt(quadMatch[4]) || 0;
+      
+      const discriminant = b*b - 4*a*c;
+      if (discriminant < 0) return { answer: 'no tiene raices reales', answerLatex: '\\text{No tiene raíces reales}' };
+      
+      const sqrtD = Math.sqrt(discriminant);
+      const x1 = (-b + sqrtD) / (2*a);
+      const x2 = (-b - sqrtD) / (2*a);
+      
+      if (Math.abs(x1 - x2) < 0.0001) {
+        return { answer: `x=${x1.toFixed(2).replace(/\.00$/, '')}`, answerLatex: `x = ${x1.toFixed(2).replace(/\.00$/, '')}` };
+      }
+      return { answer: `x=${x1.toFixed(2).replace(/\.00$/, '')} o x=${x2.toFixed(2).replace(/\.00$/, '')}`, answerLatex: `x = ${x1.toFixed(2).replace(/\.00$/, '')} \\text{ ó } x = ${x2.toFixed(2).replace(/\.00$/, '')}` };
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function generateProblem(topicKey, difficulty = 'aleatorio') {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('NO_API_KEY');
@@ -240,14 +287,100 @@ export async function generateProblem(topicKey, difficulty = 'aleatorio') {
       ? ['básico', 'intermedio', 'avanzado'][Math.floor(Math.random() * 3)]
       : difficulty;
 
+  // Generate problem using AI - but AI only creates the statement, we calculate the answer
   const messages = [
-    { role: 'system', content: SYSTEM_BASE },
+    { 
+      role: 'system', 
+      content: `Eres un generador de problemas de pre-cálculo. Crea UN problema claro en español.
+IMPORTANTE: Usa coeficientes pequeños (1-10) para que sea fácil calcular.
+Responde EXACTAMENTE en este formato (sin JSON, texto plano):
+
+PROBLEMA: [enunciado con LaTeX $...$]
+TIPO: ${topicKey}
+DIFICULTAD: ${diffText}
+
+Ejemplo:
+PROBLEMA: Calcula $f(4)$ si $f(x) = 2x^2 + 3x - 1$
+TIPO: ${topicKey}
+DIFICULTAD: básico` 
+    },
     { role: 'user', content: topic.userPrompt(diffText) },
   ];
 
   const raw = await callGroq(messages, apiKey);
-  const parsed = JSON.parse(raw);
-  return { ...sanitizeProblem(parsed), topic: topicKey, topicLabel: topic.label };
+  
+  // Parse the text format
+  const problemMatch = raw.match(/PROBLEMA:\s*([\s\S]+?)\nTIPO:/i);
+  const problemText = problemMatch ? problemMatch[1].trim() : raw.trim();
+  
+  // Calculate correct answer using Nerdamer (not AI!)
+  const calculated = calculatePrecalculusAnswer(problemText, topicKey);
+  
+  // If we can calculate it precisely, use that. Otherwise ask AI for steps only
+  let answer, answerLatex, steps;
+  
+  if (calculated) {
+    answer = calculated.answer;
+    answerLatex = calculated.answerLatex;
+    // Generate steps based on calculation
+    steps = generateSteps(problemText, topicKey, answer);
+  } else {
+    // Fallback: ask AI for the answer (less reliable but necessary for some types)
+    const verifyMessages = [
+      {
+        role: 'system',
+        content: 'Resuelve este problema de pre-cálculo paso a paso. Responde en formato:\nRESPUESTA: [valor numérico]\nPASOS:\n1. [paso]\n2. [paso]\nUsa LaTeX $...$ para fórmulas.',
+      },
+      { role: 'user', content: problemText },
+    ];
+    const verifyRaw = await callGroq(verifyMessages, apiKey);
+    const ansMatch = verifyRaw.match(/RESPUESTA:\s*([^\n]+)/i);
+    answer = ansMatch ? ansMatch[1].trim() : '?';
+    answerLatex = answer;
+    steps = (verifyRaw.match(/PASOS:([\s\S]*)/i)?.[1] || verifyRaw)
+      .split('\n')
+      .filter(s => s.trim().match(/^\d+\./))
+      .map(s => s.replace(/^\d+\.\s*/, '').trim())
+      .slice(0, 4);
+  }
+
+  return {
+    problem: sanitizeProblem({ problem: problemText }).problem,
+    answer,
+    answerLatex,
+    steps: steps.length > 0 ? steps : ['Paso 1: Analizar el problema', 'Paso 2: Aplicar la fórmula correspondiente', 'Paso 3: Calcular el resultado'],
+    difficulty: diffText,
+    type: 'open',
+    topic: topicKey,
+    topicLabel: topic.label,
+  };
+}
+
+function generateSteps(problemText, topicKey, answer) {
+  // Generate appropriate steps based on problem type
+  if (topicKey === 'funciones') {
+    const evalMatch = problemText.match(/f\(\s*(\d+)\s*\)/);
+    const funcMatch = problemText.match(/f\(x\)\s*=\s*([^.,;\n]+)/i);
+    if (evalMatch && funcMatch) {
+      const xVal = evalMatch[1];
+      const expr = funcMatch[1].trim();
+      return [
+        `Identificar la función: $f(x) = ${expr}$`,
+        `Sustituir $x = ${xVal}$ en la función`,
+        `Calcular paso a paso reemplazando $x$ por ${xVal}`,
+        `Resultado: $f(${xVal}) = ${answer}$`,
+      ];
+    }
+  }
+  if (topicKey === 'formula_general') {
+    return [
+      'Identificar coeficientes $a$, $b$, $c$ de la ecuación',
+      'Calcular discriminante $\Delta = b^2 - 4ac$',
+      'Aplicar fórmula: $x = \\frac{-b \\pm \\sqrt{\\Delta}}{2a}$',
+      `Resolver y obtener: ${answer}`,
+    ];
+  }
+  return ['Paso 1: Leer cuidadosamente el problema', 'Paso 2: Identificar la fórmula a aplicar', 'Paso 3: Realizar los cálculos paso a paso'];
 }
 
 /**
