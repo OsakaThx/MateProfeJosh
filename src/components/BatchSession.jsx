@@ -26,31 +26,27 @@ export default function BatchSession({ topicKey, hasApiKey, onScore }) {
     setAnsweredSet(new Set());
     setProgress({ current: 0, total: count });
 
-    // Force static mode OR no API key → use predefined examples
-    if (useStatic || !hasApiKey) {
+    // Predefined examples mode → use hand-curated bank
+    if (useStatic) {
       setProblems(getStaticBatch(topicKey, count));
       setLoading(false);
       return;
     }
 
+    // Random generation: now deterministic in JS, no API key needed
+    const generated = [];
     for (let i = 0; i < count; i++) {
       try {
         const p = await generateProblem(topicKey, difficulty);
-        setProblems(prev => [...prev, { ...p, id: crypto.randomUUID() }]);
+        generated.push({ ...p, id: crypto.randomUUID() });
         setProgress({ current: i + 1, total: count });
-        if (i < count - 1) await sleep(DELAY_MS);
       } catch (err) {
-        if (err.message === 'NO_API_KEY' || err.message?.includes('401')) {
-          setError('API key inválida. Cargando banco local...');
-          setProblems(getStaticBatch(topicKey, count));
-          break;
-        }
         setError(`Problema ${i + 1}: ${err.message}`);
-        await sleep(1500);
       }
     }
+    setProblems(generated);
     setLoading(false);
-  }, [topicKey, hasApiKey, count, difficulty]);
+  }, [topicKey, count, difficulty]);
 
   function handleAnswer(problemId, correct) {
     if (answeredSet.has(problemId)) return;
@@ -104,36 +100,34 @@ export default function BatchSession({ topicKey, hasApiKey, onScore }) {
 
         {/* Generate buttons */}
         <div className="flex gap-2 ml-auto flex-wrap">
-          {/* Predefined examples button - always available */}
+          {/* Predefined examples button - hand-curated bank */}
           <button
             onClick={() => loadProblems(true)}
             disabled={loading}
-            title="Problemas predefinidos verificados (sin IA, 100% correctos)"
+            title="Banco curado de problemas predefinidos"
             className="flex items-center gap-2 rounded-xl border border-green-700/60 bg-green-900/20 px-4 py-2.5 text-sm font-semibold text-green-400 transition-all hover:bg-green-900/40 active:scale-95 disabled:opacity-50"
           >
             <BookOpen size={16} />
-            Ejemplos verificados
+            Ejemplos predefinidos
           </button>
 
-          {/* AI button - only if API key */}
-          {hasApiKey && (
-            <button
-              onClick={() => loadProblems(false)}
-              disabled={loading}
-              title="Generar problemas con IA (Groq)"
-              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
-              style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
-            >
-              {loading ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : problems.length > 0 ? (
-                <RefreshCw size={16} />
-              ) : (
-                <Wand2 size={16} />
-              )}
-              {loading ? 'Generando con IA...' : 'Generar con IA'}
-            </button>
-          )}
+          {/* New random problems - generated with verified math */}
+          <button
+            onClick={() => loadProblems(false)}
+            disabled={loading}
+            title="Genera problemas aleatorios con respuestas verificadas matemáticamente"
+            className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+            style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
+          >
+            {loading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : problems.length > 0 ? (
+              <RefreshCw size={16} />
+            ) : (
+              <Wand2 size={16} />
+            )}
+            {loading ? 'Generando...' : problems.length > 0 ? 'Nuevos problemas' : 'Generar problemas'}
+          </button>
         </div>
       </div>
 

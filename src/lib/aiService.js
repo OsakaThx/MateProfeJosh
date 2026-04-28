@@ -384,7 +384,201 @@ function calculatePrecalculusAnswer(problemText, topicKey) {
   }
 }
 
+// Track recently generated problems to avoid duplicates (last 50)
+const recentProblems = new Set();
+const MAX_RECENT = 50;
+
+function trackProblem(key) {
+  recentProblems.add(key);
+  if (recentProblems.size > MAX_RECENT) {
+    const first = recentProblems.values().next().value;
+    recentProblems.delete(first);
+  }
+}
+
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function pickArr(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+/**
+ * Build problem deterministically per topic. AI is NEVER asked to compute answers.
+ */
+function buildProblem(topicKey, difficulty) {
+  // Try up to 20 times to get a non-duplicate problem
+  for (let tries = 0; tries < 20; tries++) {
+    const built = buildSingleProblem(topicKey, difficulty);
+    const key = `${topicKey}|${built.problem}`;
+    if (!recentProblems.has(key)) {
+      trackProblem(key);
+      return built;
+    }
+  }
+  // If all attempts collide, just return the latest
+  return buildSingleProblem(topicKey, difficulty);
+}
+
+function buildSingleProblem(topicKey, difficulty) {
+  const diff = difficulty === 'aleatorio' ? pickArr(['básico', 'intermedio', 'avanzado']) : difficulty;
+
+  if (topicKey === 'funciones') {
+    // f(x) = ax^2 + bx + c, evaluate at x=k
+    const a = diff === 'básico' ? rand(1, 3) : rand(1, 6);
+    const b = rand(-6, 6);
+    const c = rand(-5, 8);
+    const k = diff === 'básico' ? rand(2, 4) : rand(-3, 6);
+
+    // Build problem string with proper signs
+    const bStr = b >= 0 ? `+ ${b}x` : `- ${Math.abs(b)}x`;
+    const cStr = c >= 0 ? `+ ${c}` : `- ${Math.abs(c)}`;
+    const fxBody = `${a}x^2 ${bStr} ${cStr}`;
+    const problem = `Calcula $f(${k})$ si $f(x) = ${fxBody}$`;
+
+    // Compute answer
+    const answer = a*k*k + b*k + c;
+    const steps = [
+      `Sustituir $x = ${k}$ en la función: $f(${k}) = ${a}(${k})^2 ${bStr.replace('x', '')} (${k}) ${cStr}$`,
+      `Calcular potencia: $(${k})^2 = ${k*k}$`,
+      `Multiplicar: $${a}(${k*k}) = ${a*k*k}$ y $${b}(${k}) = ${b*k}$`,
+      `Sumar: $${a*k*k} ${b*k >= 0 ? '+' : ''} ${b*k} ${c >= 0 ? '+' : ''} ${c} = ${answer}$`,
+    ];
+    return { problem, answer: String(answer), answerLatex: String(answer), steps, difficulty: diff, type: 'open' };
+  }
+
+  if (topicKey === 'dominio_rango') {
+    const subtype = pickArr(['rational', 'sqrt']);
+    if (subtype === 'rational') {
+      const k = rand(2, 9);
+      const problem = `Hallar el dominio de $f(x) = \\dfrac{1}{x - ${k}}$`;
+      const answer = `x ≠ ${k}`;
+      const answerLatex = `(-\\infty, ${k}) \\cup (${k}, \\infty)`;
+      const steps = [
+        `El denominador no puede ser cero, así que $x - ${k} \\neq 0$`,
+        `Resolver: $x \\neq ${k}$`,
+        `Dominio: todos los reales excepto $${k}$, es decir $(-\\infty, ${k}) \\cup (${k}, \\infty)$`,
+      ];
+      return { problem, answer, answerLatex, steps, difficulty: diff, type: 'open' };
+    } else {
+      const k = rand(2, 9);
+      const problem = `Hallar el dominio de $f(x) = \\sqrt{x - ${k}}$`;
+      const answer = `x ≥ ${k}`;
+      const answerLatex = `[${k}, \\infty)`;
+      const steps = [
+        `Lo que está dentro de la raíz cuadrada debe ser $\\geq 0$`,
+        `Resolver: $x - ${k} \\geq 0 \\Rightarrow x \\geq ${k}$`,
+        `Dominio: $[${k}, \\infty)$`,
+      ];
+      return { problem, answer, answerLatex, steps, difficulty: diff, type: 'open' };
+    }
+  }
+
+  if (topicKey === 'formulas_notables') {
+    const subtype = pickArr(['cuadrado_suma', 'cuadrado_resta', 'diferencia']);
+    const a = rand(1, 5);
+    const b = rand(2, 8);
+
+    if (subtype === 'cuadrado_suma') {
+      // (ax + b)^2 = a²x² + 2abx + b²
+      const problem = `Expande $(${a}x + ${b})^2$`;
+      const t1 = a*a, t2 = 2*a*b, t3 = b*b;
+      const answer = `${t1}x^2 + ${t2}x + ${t3}`;
+      const steps = [
+        `Aplicar fórmula: $(p+q)^2 = p^2 + 2pq + q^2$`,
+        `Identificar: $p = ${a}x$ y $q = ${b}$`,
+        `Calcular cada término: $(${a}x)^2 = ${t1}x^2$, $\\;2(${a}x)(${b}) = ${t2}x$, $\\;${b}^2 = ${t3}$`,
+        `Resultado: $${answer}$`,
+      ];
+      return { problem, answer, answerLatex: answer, steps, difficulty: diff, type: 'open' };
+    }
+    if (subtype === 'cuadrado_resta') {
+      const problem = `Expande $(${a}x - ${b})^2$`;
+      const t1 = a*a, t2 = 2*a*b, t3 = b*b;
+      const answer = `${t1}x^2 - ${t2}x + ${t3}`;
+      const steps = [
+        `Aplicar fórmula: $(p-q)^2 = p^2 - 2pq + q^2$`,
+        `Identificar: $p = ${a}x$ y $q = ${b}$`,
+        `Calcular: $(${a}x)^2 = ${t1}x^2$, $\\;-2(${a}x)(${b}) = -${t2}x$, $\\;${b}^2 = ${t3}$`,
+        `Resultado: $${answer}$`,
+      ];
+      return { problem, answer, answerLatex: answer, steps, difficulty: diff, type: 'open' };
+    }
+    // diferencia de cuadrados: (ax + b)(ax - b) = a²x² - b²
+    const problem = `Expande $(${a}x + ${b})(${a}x - ${b})$`;
+    const t1 = a*a, t2 = b*b;
+    const answer = `${t1}x^2 - ${t2}`;
+    const steps = [
+      `Aplicar fórmula: $(p+q)(p-q) = p^2 - q^2$`,
+      `Identificar: $p = ${a}x$, $q = ${b}$`,
+      `Calcular: $(${a}x)^2 - ${b}^2 = ${t1}x^2 - ${t2}$`,
+      `Resultado: $${answer}$`,
+    ];
+    return { problem, answer, answerLatex: answer, steps, difficulty: diff, type: 'open' };
+  }
+
+  if (topicKey === 'factorizacion') {
+    // Build trinomial x^2 + (p+q)x + pq with integer roots
+    const p = rand(2, 7);
+    const q = rand(2, 7);
+    const sumPos = pickArr([true, false]);
+    const b = sumPos ? -(p + q) : (p + q); // x^2 - (p+q)x + pq has roots p, q
+    const c = p * q; // both positive product
+    const bStr = b >= 0 ? `+ ${b}x` : `- ${Math.abs(b)}x`;
+    const problem = `Factoriza $x^2 ${bStr} + ${c}$`;
+    // If sumPos true, both roots negative: (x-p)(x-q) when b is -(p+q)
+    // Actually: x^2 - (p+q)x + pq = (x-p)(x-q)
+    // x^2 + (p+q)x + pq = (x+p)(x+q)
+    const answer = sumPos
+      ? `(x - ${p})(x - ${q})`
+      : `(x + ${p})(x + ${q})`;
+    const steps = [
+      `Buscar dos números que multiplicados den $${c}$ y sumados den $${b}$`,
+      sumPos
+        ? `Esos números son $-${p}$ y $-${q}$ (porque $-${p} \\cdot -${q} = ${c}$ y $-${p} + (-${q}) = ${b}$)`
+        : `Esos números son $${p}$ y $${q}$ (porque $${p} \\cdot ${q} = ${c}$ y $${p} + ${q} = ${b}$)`,
+      `Por tanto, la factorización es $${answer}$`,
+    ];
+    return { problem, answer, answerLatex: answer, steps, difficulty: diff, type: 'open' };
+  }
+
+  if (topicKey === 'formula_general') {
+    // Build with integer roots r1, r2 → x^2 - (r1+r2)x + r1*r2 = 0
+    const r1 = rand(1, 5);
+    const r2 = rand(2, 7);
+    const b = -(r1 + r2);
+    const c = r1 * r2;
+    const bStr = b >= 0 ? `+ ${b}x` : `- ${Math.abs(b)}x`;
+    const cStr = c >= 0 ? `+ ${c}` : `- ${Math.abs(c)}`;
+    const problem = `Resuelve usando la fórmula general: $x^2 ${bStr} ${cStr} = 0$`;
+    const sm = Math.min(r1, r2);
+    const lg = Math.max(r1, r2);
+    const answer = sm === lg ? `x = ${sm}` : `x = ${sm} \\text{ ó } x = ${lg}`;
+    const discriminant = b*b - 4*c;
+    const steps = [
+      `Identificar coeficientes: $a = 1$, $b = ${b}$, $c = ${c}$`,
+      `Calcular discriminante: $\\Delta = b^2 - 4ac = ${b*b} - ${4*c} = ${discriminant}$`,
+      `Aplicar fórmula: $x = \\dfrac{-b \\pm \\sqrt{\\Delta}}{2a} = \\dfrac{${-b} \\pm \\sqrt{${discriminant}}}{2}$`,
+      `Calcular: $\\sqrt{${discriminant}} = ${Math.sqrt(discriminant)}$, las raíces son $x_1 = ${r1}$ y $x_2 = ${r2}$`,
+      `Resultado: $${answer}$`,
+    ];
+    return { problem, answer: sm === lg ? `x=${sm}` : `x=${sm} o x=${lg}`, answerLatex: answer, steps, difficulty: diff, type: 'open' };
+  }
+
+  throw new Error(`Topic ${topicKey} not supported`);
+}
+
 export async function generateProblem(topicKey, difficulty = 'aleatorio') {
+  const topic = TOPIC_PROMPTS[topicKey];
+  if (!topic) throw new Error('Unknown topic');
+
+  // Build problem deterministically (no AI involved in generation OR answer)
+  const built = buildProblem(topicKey, difficulty);
+  return {
+    ...built,
+    topic: topicKey,
+    topicLabel: topic.label,
+  };
+}
+
+// Old AI-based generation kept for reference but unused
+async function _legacyGenerateProblem(topicKey, difficulty = 'aleatorio') {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('NO_API_KEY');
 
