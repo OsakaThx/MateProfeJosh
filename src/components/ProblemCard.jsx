@@ -147,17 +147,21 @@ function ConceptPanel({ problem, onClose, hasApiKey }) {
 
           {/* AI verified explanation */}
           {hasApiKey && (
-            <div className="rounded-xl border border-purple-800/40 bg-purple-900/10 p-4 space-y-2">
-              <div className="flex items-center gap-2 mb-1">
+            <div className="rounded-xl border border-purple-800/40 bg-purple-900/10 p-4 space-y-3">
+              <div className="flex items-center gap-2">
                 <p className="text-xs font-bold text-purple-400 uppercase tracking-wider">🤖 Explicación verificada por IA (Groq)</p>
                 {loadingAI && <Loader2 size={12} className="animate-spin text-purple-400" />}
               </div>
               {loadingAI ? (
                 <p className="text-xs text-gray-500 animate-pulse">Consultando IA para verificar la explicación...</p>
               ) : aiVerified ? (
-                <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-line">
-                  <MathText text={aiVerified} />
-                </p>
+                <div className="space-y-2">
+                  {aiVerified.split('\n\n').filter(p => p.trim()).map((paragraph, i) => (
+                    <p key={i} className="text-sm text-gray-200 leading-relaxed">
+                      <MathText text={paragraph.replace(/\n/g, ' ').trim()} />
+                    </p>
+                  ))}
+                </div>
               ) : (
                 <p className="text-xs text-gray-500">No se pudo cargar la verificación IA.</p>
               )}
