@@ -1,12 +1,14 @@
 /**
  * aiService.js
- * Usa la API de Groq (GRATIS) con el modelo llama-3.3-70b-versatile.
+ * Usa la API de Groq (GRATIS) con el modelo mixtral-8x7b-32768.
+ * Mixtral es más consistente con cálculos matemáticos que Llama.
  * Obtén tu clave gratuita en: https://console.groq.com/keys
  * La clave se guarda SOLO en localStorage del navegador.
  */
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+// Mixtral suele ser más consistente con cálculos matemáticos precisos que Llama
+const GROQ_MODEL = 'mixtral-8x7b-32768';
 const DELAY_MS = 600; // ms entre peticiones para no exceder TPM
 
 function sleep(ms) {
@@ -16,13 +18,16 @@ function sleep(ms) {
 const SYSTEM_BASE = `Eres MateProfe, tutor de pre-cálculo. Respondes SIEMPRE en español.
 RESPONDE ÚNICAMENTE con un objeto JSON válido, sin texto antes ni después, sin markdown.
 
-REGLA CRÍTICA #1 - VERIFICACIÓN OBLIGATORIA:
-Antes de escribir tu JSON, calcula la respuesta DOS VECES en silencio paso a paso.
-Si los dos cálculos no coinciden, recalcula hasta estar 100% seguro.
-La respuesta en "answer" DEBE coincidir EXACTAMENTE con el resultado de tus pasos.
-Por ejemplo, si $f(x)=2x^2+4x-3$ y piden $f(4)$:
-  $f(4) = 2(4)^2 + 4(4) - 3 = 2(16) + 16 - 3 = 32 + 16 - 3 = 45$
-La respuesta es 45, NO 29. Verifica el orden de operaciones.
+REGLA CRÍTICA #1 - ORDEN DE OPERACIONES Y VERIFICACIÓN:
+Primero potencias/exponentes, luego multiplicaciones/divisions, luego sumas/restas.
+NO hagas $2(4)^2 = 8^2 = 64$. Lo correcto es: $2(4)^2 = 2(16) = 32$.
+
+Antes de escribir tu JSON, calcula la respuesta DOS VECES paso a paso.
+Ejemplo: $f(x)=4x^2+8x-5$, calcular $f(8)$:
+  Paso 1: Potencia primero → $8^2 = 64$
+  Paso 2: Multiplicaciones → $4(64) = 256$, $8(8) = 64$
+  Paso 3: Suma y resta → $256 + 64 - 5 = 315$
+Respuesta: 315. NO inventes números como 507. NO sumes dos veces el mismo término.
 
 REGLA CRÍTICA #2 - LATEX:
 Toda expresión matemática DEBE ir entre signos de dólar.
@@ -196,7 +201,7 @@ async function callGroq(messages, apiKey, retries = 2) {
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages,
-        temperature: 0.9,
+        temperature: 0.1, // temperatura baja = cálculos más consistentes
         max_tokens: 512,
         response_format: { type: 'json_object' },
       }),
@@ -365,7 +370,7 @@ Tema: ${problem.topicLabel}`,
     body: JSON.stringify({
       model: GROQ_MODEL,
       messages,
-      temperature: 0.2, // baja temperatura = menos errores y menos contradicciones
+      temperature: 0.1, // temperatura muy baja para máxima consistencia matemática
       max_tokens: 600,
     }),
   });
