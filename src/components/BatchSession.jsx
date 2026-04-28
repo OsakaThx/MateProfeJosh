@@ -19,14 +19,15 @@ export default function BatchSession({ topicKey, hasApiKey, onScore }) {
   const [count, setCount] = useState(3);
   const [answeredSet, setAnsweredSet] = useState(new Set());
 
-  const loadProblems = useCallback(async () => {
+  const loadProblems = useCallback(async (useStatic = false) => {
     setLoading(true);
     setError('');
     setProblems([]);
     setAnsweredSet(new Set());
     setProgress({ current: 0, total: count });
 
-    if (!hasApiKey) {
+    // Force static mode OR no API key → use predefined examples
+    if (useStatic || !hasApiKey) {
       setProblems(getStaticBatch(topicKey, count));
       setLoading(false);
       return;
@@ -45,7 +46,6 @@ export default function BatchSession({ topicKey, hasApiKey, onScore }) {
           break;
         }
         setError(`Problema ${i + 1}: ${err.message}`);
-        // continue with remaining if possible
         await sleep(1500);
       }
     }
@@ -102,27 +102,38 @@ export default function BatchSession({ topicKey, hasApiKey, onScore }) {
           </div>
         </div>
 
-        {/* Generate button */}
-        <div className="flex gap-2 ml-auto">
+        {/* Generate buttons */}
+        <div className="flex gap-2 ml-auto flex-wrap">
+          {/* Predefined examples button - always available */}
           <button
-            onClick={loadProblems}
+            onClick={() => loadProblems(true)}
             disabled={loading}
-            className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
-            style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
+            title="Problemas predefinidos verificados (sin IA, 100% correctos)"
+            className="flex items-center gap-2 rounded-xl border border-green-700/60 bg-green-900/20 px-4 py-2.5 text-sm font-semibold text-green-400 transition-all hover:bg-green-900/40 active:scale-95 disabled:opacity-50"
           >
-            {loading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : problems.length > 0 ? (
-              <RefreshCw size={16} />
-            ) : (
-              hasApiKey ? <Wand2 size={16} /> : <BookOpen size={16} />
-            )}
-            {loading
-              ? `Generando${hasApiKey ? ' con IA' : ''}...`
-              : problems.length > 0
-              ? 'Nuevos problemas'
-              : hasApiKey ? 'Generar con IA' : 'Cargar ejercicios'}
+            <BookOpen size={16} />
+            Ejemplos verificados
           </button>
+
+          {/* AI button - only if API key */}
+          {hasApiKey && (
+            <button
+              onClick={() => loadProblems(false)}
+              disabled={loading}
+              title="Generar problemas con IA (Groq)"
+              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
+            >
+              {loading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : problems.length > 0 ? (
+                <RefreshCw size={16} />
+              ) : (
+                <Wand2 size={16} />
+              )}
+              {loading ? 'Generando con IA...' : 'Generar con IA'}
+            </button>
+          )}
         </div>
       </div>
 

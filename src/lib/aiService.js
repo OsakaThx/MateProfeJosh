@@ -418,40 +418,44 @@ DIFICULTAD: básico`
 
   const raw = await callGroq(messages, apiKey);
   
-  // AGGRESSIVE CLEANING: Fix AI broken output with newlines between chars
+  // CLEAN AI text but PRESERVE structure markers
   function cleanAiText(text) {
     if (!text) return '';
     
-    // Remove nulls and control chars
+    // Remove control chars
     text = text.replace(/[\x00-\x08\x0b-\x0c\x0e-\x1f]/g, '');
     
-    // Fix the most common AI bug: single chars on separate lines like "f\n(\n3\n)"
-    // Join lines that are single non-space characters
-    text = text.replace(/^(\S)\s*$/gm, '$1');
-    text = text.replace(/(\S)\n+(?=\S)/g, '$1');
+    // Remove broken nulls and unicode artifacts
+    text = text.replace(/\u200b/g, '');
     
-    // Remove all newlines within LaTeX expressions ($...$)
-    text = text.replace(/\$([^$]*)\n+([^$]*)\$/g, '$$1$2$');
+    // Fix LaTeX with extra dollars: $$...$$ → $...$
+    text = text.replace(/\$\$+/g, '$');
     
-    // Collapse all whitespace to single spaces
-    text = text.replace(/\s+/g, ' ');
-    
-    // Fix broken LaTeX commands
-    text = text.replace(/\\\s+/g, '\\');
-    
-    // Remove garbage quotes and escapes
-    text = text.replace(/\\{3,}/g, '');
-    text = text.replace(/["]{2,}/g, '"');
-    text = text.replace(/'\s*'/g, '');
+    // Fix broken LaTeX commands with spaces
+    text = text.replace(/\\\s+([a-zA-Z])/g, '\\$1');
     
     return text.trim();
   }
   
   const cleanedRaw = cleanAiText(raw);
   
-  // Parse the text format - be very flexible
-  const problemMatch = cleanedRaw.match(/PROBLEMA[:\s]+([\s\S]+?)(?:\nTIPO:|$)/i);
-  const problemText = problemMatch ? problemMatch[1].trim() : cleanedRaw.trim();
+  // Parse: extract just the part after "PROBLEMA:" and before "TIPO:"
+  // Be flexible: TIPO might be on same line or next line, with or without colon
+  let problemText;
+  const problemMatch = cleanedRaw.match(/PROBLEMA\s*:?\s*([\s\S]+?)(?=\s*TIPO\s*:|\s*DIFICULTAD\s*:|$)/i);
+  if (problemMatch) {
+    problemText = problemMatch[1].trim();
+  } else {
+    // Fallback: take first line that has math
+    const lines = cleanedRaw.split(/\n/).filter(l => l.trim());
+    problemText = lines.find(l => l.includes('$')) || lines[0] || cleanedRaw;
+  }
+  
+  // Final cleanup of problem text
+  problemText = problemText
+    .replace(/\$\$/g, '$')           // double dollar to single
+    .replace(/\s+/g, ' ')             // collapse whitespace
+    .trim();
   
   // Calculate correct answer using Nerdamer (not AI!)
   const calculated = calculatePrecalculusAnswer(problemText, topicKey);
