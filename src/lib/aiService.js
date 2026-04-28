@@ -7,47 +7,48 @@
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const DELAY_MS = 600; // ms entre peticiones para no exceder TPM
 
-const SYSTEM_BASE = `Eres MateProfe, un tutor experto en pre-cálculo. Respondes SIEMPRE en español.
-Cuando uses expresiones matemáticas, escríbelas en LaTeX entre $ ... $ (inline) o $$ ... $$ (display).
-Eres paciente, claro y motivador. Siempre verificas que los problemas sean matemáticamente correctos.`;
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+const SYSTEM_BASE = `Eres MateProfe, tutor de pre-cálculo. Respondes SIEMPRE en español.
+RESPONDE ÚNICAMENTE con un objeto JSON válido, sin texto antes ni después, sin bloques de código markdown.
+Usa LaTeX solo dentro de los valores del JSON, entre $ (inline).`;
+
+const JSON_SHAPE = `{"problem":"enunciado en español","answer":"respuesta","answerLatex":"LaTeX","steps":["paso 1","paso 2","paso 3"],"difficulty":"básico","type":"open"}`;
 
 const TOPIC_PROMPTS = {
   funciones: {
     label: 'Funciones',
-    systemPrompt: `${SYSTEM_BASE}
-Genera problemas variados sobre funciones matemáticas: evaluación de f(x), composición, identificar funciones.
-Responde SOLO con JSON válido, sin texto extra, con esta estructura EXACTA:
-{"problem":"enunciado en español con LaTeX $...$","answer":"respuesta exacta","answerLatex":"respuesta en LaTeX","steps":["paso 1","paso 2","paso 3"],"difficulty":"básico","type":"open"}`,
+    userPrompt: (diff) => `Genera UN problema de pre-cálculo sobre funciones (evaluación f(x), composición, o identificar función). Dificultad: ${diff}.
+Devuelve ÚNICAMENTE este JSON (sin texto extra, sin markdown):
+${JSON_SHAPE}`,
   },
   dominio_rango: {
     label: 'Dominio y Rango',
-    systemPrompt: `${SYSTEM_BASE}
-Genera problemas sobre dominio y rango de funciones. Incluye funciones racionales, con raíces, logarítmicas.
-Responde SOLO con JSON válido, sin texto extra, con esta estructura EXACTA:
-{"problem":"enunciado en español con LaTeX $...$","answer":"respuesta en notación intervalo","answerLatex":"LaTeX del intervalo","steps":["paso 1","paso 2","paso 3"],"difficulty":"básico","type":"open"}`,
+    userPrompt: (diff) => `Genera UN problema sobre dominio de una función (racional, con raíz o logarítmica). Dificultad: ${diff}.
+Devuelve ÚNICAMENTE este JSON (sin texto extra, sin markdown):
+${JSON_SHAPE}`,
   },
   formulas_notables: {
     label: 'Fórmulas Notables',
-    systemPrompt: `${SYSTEM_BASE}
-Genera problemas de productos notables: cuadrado de binomio, diferencia de cuadrados, cubos.
-Pide expandir O factorizar (varía entre problemas).
-Responde SOLO con JSON válido, sin texto extra, con esta estructura EXACTA:
-{"problem":"enunciado con LaTeX $...$","answer":"expresión matemática resultado","answerLatex":"LaTeX del resultado","steps":["paso 1","paso 2","paso 3"],"difficulty":"básico","type":"open"}`,
+    userPrompt: (diff) => `Genera UN problema de productos notables (expandir o factorizar: cuadrado binomio, diferencia cuadrados, cubos). Dificultad: ${diff}.
+Devuelve ÚNICAMENTE este JSON (sin texto extra, sin markdown):
+${JSON_SHAPE}`,
   },
   factorizacion: {
     label: 'Factorización',
-    systemPrompt: `${SYSTEM_BASE}
-Genera problemas de factorización de polinomios: factor común, diferencia cuadrados, suma/diferencia cubos, trinomios.
-Responde SOLO con JSON válido, sin texto extra, con esta estructura EXACTA:
-{"problem":"enunciado con LaTeX $...$","answer":"forma factorizada","answerLatex":"LaTeX factorizado","steps":["paso 1","paso 2","paso 3"],"difficulty":"básico","type":"open"}`,
+    userPrompt: (diff) => `Genera UN problema de factorización de polinomios (factor común, diferencia cuadrados, suma/diferencia cubos, o trinomio). Dificultad: ${diff}.
+Devuelve ÚNICAMENTE este JSON (sin texto extra, sin markdown):
+${JSON_SHAPE}`,
   },
   formula_general: {
     label: 'Fórmula General',
-    systemPrompt: `${SYSTEM_BASE}
-Genera problemas de ecuaciones cuadráticas ax²+bx+c=0 para resolver con la fórmula general.
-Responde SOLO con JSON válido, sin texto extra, con esta estructura EXACTA:
-{"problem":"enunciado con LaTeX $...$","answer":"x = val1 o x = val2","answerLatex":"x = \\text{val1} \\text{ ó } x = \\text{val2}","steps":["paso 1","paso 2","paso 3","paso 4"],"difficulty":"básico","type":"open"}`,
+    userPrompt: (diff) => `Genera UN problema de ecuación cuadrática ax²+bx+c=0 para resolver con la fórmula general. Dificultad: ${diff}.
+Devuelve ÚNICAMENTE este JSON (sin texto extra, sin markdown):
+${JSON_SHAPE}`,
   },
 };
 
@@ -55,29 +56,39 @@ function getApiKey() {
   return localStorage.getItem('groq_api_key') || '';
 }
 
-async function callGroq(messages, apiKey) {
-  const response = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages,
-      temperature: 0.8,
-      max_tokens: 1024,
-      response_format: { type: 'json_object' },
-    }),
-  });
+async function callGroq(messages, apiKey, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const response = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages,
+        temperature: 0.7,
+        max_tokens: 512,
+        response_format: { type: 'json_object' },
+      }),
+    });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${response.status}`);
+    if (response.status === 429) {
+      // Rate limited — wait and retry
+      const retryAfter = parseInt(response.headers.get('retry-after') || '2', 10);
+      await sleep((retryAfter * 1000) + 500);
+      continue;
+    }
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
   }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
+  throw new Error('Rate limit: demasiadas peticiones. Intenta con menos problemas.');
 }
 
 /**
@@ -92,15 +103,12 @@ export async function generateProblem(topicKey, difficulty = 'aleatorio') {
 
   const diffText =
     difficulty === 'aleatorio'
-      ? 'Elige aleatoriamente entre básico, intermedio o avanzado.'
-      : `Dificultad: ${difficulty}.`;
+      ? ['básico', 'intermedio', 'avanzado'][Math.floor(Math.random() * 3)]
+      : difficulty;
 
   const messages = [
-    { role: 'system', content: topic.systemPrompt },
-    {
-      role: 'user',
-      content: `Genera UN problema nuevo y diferente de ${topic.label}. ${diffText} Devuelve SOLO el JSON, sin explicaciones adicionales.`,
-    },
+    { role: 'system', content: SYSTEM_BASE },
+    { role: 'user', content: topic.userPrompt(diffText) },
   ];
 
   const raw = await callGroq(messages, apiKey);
@@ -112,11 +120,13 @@ export async function generateProblem(topicKey, difficulty = 'aleatorio') {
  * Generate multiple problems at once (batch). Uses Promise.all for speed.
  */
 export async function generateBatch(topicKey, count = 5, difficulty = 'aleatorio') {
-  const tasks = Array.from({ length: count }, () =>
-    generateProblem(topicKey, difficulty)
-  );
-  const results = await Promise.all(tasks);
-  return results.map(p => ({ ...p, id: crypto.randomUUID() }));
+  const results = [];
+  for (let i = 0; i < count; i++) {
+    const p = await generateProblem(topicKey, difficulty);
+    results.push({ ...p, id: crypto.randomUUID() });
+    if (i < count - 1) await sleep(DELAY_MS);
+  }
+  return results;
 }
 
 /**

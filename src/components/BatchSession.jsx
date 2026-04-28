@@ -1,8 +1,11 @@
 import { useState, useCallback } from 'react';
 import { Loader2, RefreshCw, Wand2, BookOpen } from 'lucide-react';
 import ProblemCard from './ProblemCard';
-import { generateBatch } from '../lib/aiService';
+import { generateProblem } from '../lib/aiService';
 import { getStaticBatch } from '../lib/staticProblems';
+
+const DELAY_MS = 650;
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 const DIFFICULTIES = ['aleatorio', 'básico', 'intermedio', 'avanzado'];
 const COUNTS = [3, 5, 8, 10];
@@ -10,9 +13,10 @@ const COUNTS = [3, 5, 8, 10];
 export default function BatchSession({ topicKey, hasApiKey, onScore }) {
   const [problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState('');
   const [difficulty, setDifficulty] = useState('aleatorio');
-  const [count, setCount] = useState(5);
+  const [count, setCount] = useState(3);
   const [answeredSet, setAnsweredSet] = useState(new Set());
 
   const loadProblems = useCallback(async () => {
@@ -20,26 +24,32 @@ export default function BatchSession({ topicKey, hasApiKey, onScore }) {
     setError('');
     setProblems([]);
     setAnsweredSet(new Set());
+    setProgress({ current: 0, total: count });
 
-    try {
-      let batch;
-      if (hasApiKey) {
-        batch = await generateBatch(topicKey, count, difficulty);
-      } else {
-        batch = getStaticBatch(topicKey, count);
-      }
-      setProblems(batch);
-    } catch (err) {
-      if (err.message === 'NO_API_KEY' || err.message?.includes('401')) {
-        setError('API key inválida. Usando banco local de problemas.');
-        setProblems(getStaticBatch(topicKey, count));
-      } else {
-        setError(`Error: ${err.message}. Cargando banco local...`);
-        setProblems(getStaticBatch(topicKey, count));
-      }
-    } finally {
+    if (!hasApiKey) {
+      setProblems(getStaticBatch(topicKey, count));
       setLoading(false);
+      return;
     }
+
+    for (let i = 0; i < count; i++) {
+      try {
+        const p = await generateProblem(topicKey, difficulty);
+        setProblems(prev => [...prev, { ...p, id: crypto.randomUUID() }]);
+        setProgress({ current: i + 1, total: count });
+        if (i < count - 1) await sleep(DELAY_MS);
+      } catch (err) {
+        if (err.message === 'NO_API_KEY' || err.message?.includes('401')) {
+          setError('API key inválida. Cargando banco local...');
+          setProblems(getStaticBatch(topicKey, count));
+          break;
+        }
+        setError(`Problema ${i + 1}: ${err.message}`);
+        // continue with remaining if possible
+        await sleep(1500);
+      }
+    }
+    setLoading(false);
   }, [topicKey, hasApiKey, count, difficulty]);
 
   function handleAnswer(problemId, correct) {
@@ -131,21 +141,30 @@ export default function BatchSession({ topicKey, hasApiKey, onScore }) {
         </div>
       )}
 
-      {/* Loading skeleton */}
-      {loading && (
-        <div className="space-y-4">
-          {Array.from({ length: count }).map((_, i) => (
-            <div key={i} className="rounded-2xl border border-gray-800 bg-gray-900/40 p-5 animate-pulse">
-              <div className="h-4 bg-gray-700 rounded w-3/4 mb-3" />
-              <div className="h-4 bg-gray-700 rounded w-1/2 mb-5" />
-              <div className="h-10 bg-gray-800 rounded-xl" />
-            </div>
-          ))}
+      {/* Progress bar while loading with AI */}
+      {loading && hasApiKey && (
+        <div className="rounded-2xl border border-purple-800/30 bg-purple-900/10 p-4 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2 text-purple-300">
+              <Loader2 size={14} className="animate-spin" />
+              Generando problema {progress.current + 1} de {progress.total}...
+            </span>
+            <span className="text-gray-500 text-xs">{progress.current}/{progress.total}</span>
+          </div>
+          <div className="w-full bg-gray-800 rounded-full h-1.5">
+            <div
+              className="h-1.5 rounded-full transition-all duration-500"
+              style={{
+                width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%`,
+                background: 'linear-gradient(90deg, #7c3aed, #a855f7)',
+              }}
+            />
+          </div>
         </div>
       )}
 
-      {/* Problems */}
-      {!loading && problems.length > 0 && (
+      {/* Problems — appear one by one as they arrive */}
+      {problems.length > 0 && (
         <div className="space-y-4">
           {problems.map((problem, i) => (
             <ProblemCard
@@ -160,7 +179,7 @@ export default function BatchSession({ topicKey, hasApiKey, onScore }) {
       )}
 
       {/* Empty state */}
-      {!loading && problems.length === 0 && !error && (
+      {!loading && problems.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-800 border-dashed py-16 text-center">
           <div className="text-5xl mb-4">🧮</div>
           <p className="text-gray-400 text-sm">
