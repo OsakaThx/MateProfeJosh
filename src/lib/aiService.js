@@ -1,14 +1,13 @@
 /**
  * aiService.js
- * Usa la API de Groq (GRATIS) con el modelo mixtral-8x7b-32768.
- * Mixtral es más consistente con cálculos matemáticos que Llama.
+ * Usa la API de Groq (GRATIS) con el modelo llama-3.1-70b-versatile.
  * Obtén tu clave gratuita en: https://console.groq.com/keys
  * La clave se guarda SOLO en localStorage del navegador.
  */
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-// Mixtral suele ser más consistente con cálculos matemáticos precisos que Llama
-const GROQ_MODEL = 'mixtral-8x7b-32768';
+// Usamos llama-3.1-70b que es estable y bueno para matemáticas
+const GROQ_MODEL = 'llama-3.1-70b-versatile';
 const DELAY_MS = 600; // ms entre peticiones para no exceder TPM
 
 function sleep(ms) {
