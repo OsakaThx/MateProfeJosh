@@ -304,4 +304,42 @@ Responde SOLO con JSON: {"explanation":"texto con pasos numerados y LaTeX"}`,
   return parsed.explanation;
 }
 
+/**
+ * Asks Groq to provide a verified, student-friendly explanation of
+ * what the problem is asking and how to solve it, in plain Spanish.
+ */
+export async function getConceptExplanation(problem) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('NO_API_KEY');
+
+  const messages = [
+    {
+      role: 'system',
+      content: `${SYSTEM_BASE}
+Eres un tutor paciente explicando a un estudiante que no entiende el problema.
+Explica en texto plano claro y sencillo (no JSON):
+1. Qué le están pidiendo exactamente
+2. Qué concepto matemático se aplica y por qué tiene ese nombre
+3. Cómo se resuelve este problema específico, paso a paso con palabras
+Usa LaTeX entre $ para fórmulas. Máximo 200 palabras.`,
+    },
+    {
+      role: 'user',
+      content: `Explícame este problema de pre-cálculo como si tuviera 15 años y nunca lo hubiera visto:
+Problema: ${problem.problem}
+Respuesta correcta: ${problem.answer}
+Tema: ${problem.topicLabel}`,
+    },
+  ];
+
+  const response = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ model: GROQ_MODEL, messages, temperature: 0.6, max_tokens: 400 }),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  return data.choices[0].message.content;
+}
+
 export { TOPIC_PROMPTS };

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle2, XCircle, Lightbulb, ChevronDown, ChevronUp, ArrowRight, HelpCircle, X, BookOpen } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { CheckCircle2, XCircle, Lightbulb, ChevronDown, ChevronUp, ArrowRight, HelpCircle, X, BookOpen, Loader2 } from 'lucide-react';
 import { MathText, MathDisplay } from './MathRenderer';
 import { checkAnswer } from '../lib/mathChecker';
-import { evaluateAnswer, getExplanation } from '../lib/aiService';
+import { evaluateAnswer, getExplanation, getConceptExplanation } from '../lib/aiService';
 
 const DIFFICULTY_COLORS = {
   'básico': 'bg-green-900/40 text-green-400 border-green-800',
@@ -49,21 +50,38 @@ const CONCEPT_GUIDE = {
   },
 };
 
-function ConceptPanel({ problem, onClose }) {
+function ConceptPanel({ problem, onClose, hasApiKey }) {
   const guide = CONCEPT_GUIDE[problem.topic] || null;
+  const [aiVerified, setAiVerified] = useState('');
+  const [loadingAI, setLoadingAI] = useState(false);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
-      onClick={onClose}>
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  useEffect(() => {
+    if (!hasApiKey) return;
+    setLoadingAI(true);
+    getConceptExplanation(problem)
+      .then(text => setAiVerified(text))
+      .catch(() => setAiVerified(''))
+      .finally(() => setLoadingAI(false));
+  }, [problem.id]);
+
+  const panel = (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6"
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-lg rounded-2xl border border-purple-800/50 overflow-hidden animate-fade-in max-h-[90vh] overflow-y-auto"
-        style={{ background: '#13131f' }}
+        className="relative w-full max-w-xl rounded-2xl border border-purple-700/60 flex flex-col animate-fade-in"
+        style={{ background: '#0f0f1a', maxHeight: 'calc(100vh - 48px)', boxShadow: '0 0 40px rgba(124,58,237,0.25)' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 sticky top-0"
-          style={{ background: '#13131f' }}>
+        {/* Sticky header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-purple-900/60 border border-purple-700 flex items-center justify-center">
               <BookOpen size={14} className="text-purple-400" />
@@ -72,15 +90,18 @@ function ConceptPanel({ problem, onClose }) {
               {guide ? guide.titulo : '¿Qué me están pidiendo?'}
             </h3>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
-            <X size={18} />
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-all">
+            <X size={15} />
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-5">
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5"
+          style={{ scrollbarWidth: 'thin', scrollbarColor: '#4c4c6d #1e1e2e' }}>
+
           {/* Problem restatement */}
-          <div className="rounded-xl border border-gray-700 bg-gray-900/40 p-4">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">📋 El problema dice:</p>
+          <div className="rounded-xl border border-gray-700 bg-gray-900/50 p-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">📋 El problema te pide:</p>
             <p className="text-white text-sm leading-relaxed">
               <MathText text={problem.problem} />
             </p>
@@ -89,16 +110,16 @@ function ConceptPanel({ problem, onClose }) {
           {guide && (
             <>
               {/* Definition */}
-              <div className="space-y-1.5">
-                <p className="text-xs font-bold text-purple-400 uppercase tracking-wider">📖 Definición</p>
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-purple-400 uppercase tracking-wider">📖 ¿Qué significa esto?</p>
                 <p className="text-sm text-gray-200 leading-relaxed">
                   <MathText text={guide.definicion} />
                 </p>
               </div>
 
               {/* Rule */}
-              <div className="rounded-xl border border-blue-800/40 bg-blue-900/10 p-4 space-y-1.5">
-                <p className="text-xs font-bold text-blue-400 uppercase tracking-wider">📐 La Regla / Fórmula</p>
+              <div className="rounded-xl border border-blue-800/40 bg-blue-900/10 p-4 space-y-2">
+                <p className="text-xs font-bold text-blue-400 uppercase tracking-wider">📐 La fórmula que necesitas</p>
                 {guide.regla.split('\n').map((line, i) => (
                   <p key={i} className="text-sm text-gray-200 leading-relaxed">
                     <MathText text={line} />
@@ -107,15 +128,15 @@ function ConceptPanel({ problem, onClose }) {
               </div>
 
               {/* Example */}
-              <div className="rounded-xl border border-green-800/40 bg-green-900/10 p-4 space-y-1.5">
-                <p className="text-xs font-bold text-green-400 uppercase tracking-wider">✏️ Ejemplo resuelto</p>
+              <div className="rounded-xl border border-green-800/40 bg-green-900/10 p-4 space-y-2">
+                <p className="text-xs font-bold text-green-400 uppercase tracking-wider">✏️ Ejemplo con números distintos</p>
                 <p className="text-sm text-gray-200 leading-relaxed">
                   <MathText text={guide.ejemplo} />
                 </p>
               </div>
 
-              {/* Origin / Why */}
-              <div className="rounded-xl border border-yellow-800/30 bg-yellow-900/10 p-4 space-y-1.5">
+              {/* Origin */}
+              <div className="rounded-xl border border-yellow-800/30 bg-yellow-900/10 p-4 space-y-2">
                 <p className="text-xs font-bold text-yellow-400 uppercase tracking-wider">💡 ¿Por qué existe esta regla?</p>
                 <p className="text-sm text-gray-300 leading-relaxed">
                   <MathText text={guide.origen} />
@@ -124,13 +145,32 @@ function ConceptPanel({ problem, onClose }) {
             </>
           )}
 
-          {/* Problem steps */}
-          <div className="space-y-1.5">
-            <p className="text-xs font-bold text-purple-400 uppercase tracking-wider">🔢 Pasos para resolver ESTE problema</p>
+          {/* AI verified explanation */}
+          {hasApiKey && (
+            <div className="rounded-xl border border-purple-800/40 bg-purple-900/10 p-4 space-y-2">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-xs font-bold text-purple-400 uppercase tracking-wider">🤖 Explicación verificada por IA (Groq)</p>
+                {loadingAI && <Loader2 size={12} className="animate-spin text-purple-400" />}
+              </div>
+              {loadingAI ? (
+                <p className="text-xs text-gray-500 animate-pulse">Consultando IA para verificar la explicación...</p>
+              ) : aiVerified ? (
+                <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-line">
+                  <MathText text={aiVerified} />
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500">No se pudo cargar la verificación IA.</p>
+              )}
+            </div>
+          )}
+
+          {/* Steps for THIS problem */}
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-purple-400 uppercase tracking-wider">🔢 Cómo resolver ESTE problema paso a paso</p>
             <div className="space-y-2">
               {problem.steps?.map((step, i) => (
-                <div key={i} className="flex items-start gap-2.5 rounded-lg bg-gray-900/40 px-3 py-2.5">
-                  <span className="shrink-0 w-5 h-5 rounded-full bg-purple-800/60 text-purple-300 text-xs flex items-center justify-center font-bold mt-0.5">
+                <div key={i} className="flex items-start gap-3 rounded-xl bg-gray-900/50 border border-gray-800 px-4 py-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-purple-800/70 text-purple-300 text-xs flex items-center justify-center font-bold mt-0.5">
                     {i + 1}
                   </span>
                   <p className="text-sm text-gray-200 leading-relaxed">
@@ -138,18 +178,29 @@ function ConceptPanel({ problem, onClose }) {
                   </p>
                 </div>
               ))}
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-green-800/40 bg-green-900/10 mt-1">
-                <span className="text-green-400 font-bold text-xs">✓ Respuesta:</span>
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-green-700/50 bg-green-900/15">
+                <span className="text-green-400 font-bold text-sm shrink-0">✓ Respuesta:</span>
                 <span className="text-white text-sm font-semibold">
                   <MathDisplay latex={problem.answerLatex} />
                 </span>
               </div>
             </div>
           </div>
+
+          {/* Close button at bottom */}
+          <button
+            onClick={onClose}
+            className="w-full rounded-xl py-3 text-sm font-semibold text-white transition-all hover:opacity-90"
+            style={{ background: 'linear-gradient(135deg,#7c3aed,#a855f7)' }}
+          >
+            Entendido, voy a resolverlo
+          </button>
         </div>
       </div>
     </div>
   );
+
+  return createPortal(panel, document.body);
 }
 
 export default function ProblemCard({ problem, index, onAnswer, hasApiKey }) {
@@ -357,7 +408,7 @@ export default function ProblemCard({ problem, index, onAnswer, hasApiKey }) {
       )}
 
       {showConcept && (
-        <ConceptPanel problem={problem} onClose={() => setShowConcept(false)} />
+        <ConceptPanel problem={problem} onClose={() => setShowConcept(false)} hasApiKey={hasApiKey} />
       )}
     </div>
   );
