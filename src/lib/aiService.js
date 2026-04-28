@@ -15,7 +15,17 @@ function sleep(ms) {
 
 const SYSTEM_BASE = `Eres MateProfe, tutor de pre-cálculo. Respondes SIEMPRE en español.
 RESPONDE ÚNICAMENTE con un objeto JSON válido, sin texto antes ni después, sin markdown.
-REGLA CRÍTICA DE LATEX: Toda expresión matemática DEBE ir entre signos de dólar.
+
+REGLA CRÍTICA #1 - VERIFICACIÓN OBLIGATORIA:
+Antes de escribir tu JSON, calcula la respuesta DOS VECES en silencio paso a paso.
+Si los dos cálculos no coinciden, recalcula hasta estar 100% seguro.
+La respuesta en "answer" DEBE coincidir EXACTAMENTE con el resultado de tus pasos.
+Por ejemplo, si $f(x)=2x^2+4x-3$ y piden $f(4)$:
+  $f(4) = 2(4)^2 + 4(4) - 3 = 2(16) + 16 - 3 = 32 + 16 - 3 = 45$
+La respuesta es 45, NO 29. Verifica el orden de operaciones.
+
+REGLA CRÍTICA #2 - LATEX:
+Toda expresión matemática DEBE ir entre signos de dólar.
 CORRECTO: "Calcula $f(3)$ si $f(x) = 2x + 1$"
 INCORRECTO: "Calcula f(3) si f(x) = 2x + 1"
 CORRECTO en steps: "Sustituir $x = 3$: $f(3) = 2(3)+1 = 7$"
@@ -315,19 +325,36 @@ export async function getConceptExplanation(problem) {
   const messages = [
     {
       role: 'system',
-      content: `${SYSTEM_BASE}
-Eres un tutor paciente explicando a un estudiante que no entiende el problema.
-Explica en texto plano claro y sencillo (no JSON):
-1. Qué le están pidiendo exactamente
-2. Qué concepto matemático se aplica y por qué tiene ese nombre
-3. Cómo se resuelve este problema específico, paso a paso con palabras
-Usa LaTeX entre $ para fórmulas. Máximo 200 palabras.`,
+      content: `Eres un tutor de pre-cálculo paciente y RIGUROSO. Respondes SIEMPRE en español.
+REGLAS ABSOLUTAS:
+1. Resuelve el problema TÚ MISMO desde cero, paso a paso, con cuidado.
+2. NUNCA te contradigas. Si calculas algo, mantén ese resultado. No digas "no, espera, en realidad...".
+3. Verifica tu cálculo final dos veces ANTES de escribirlo.
+4. Usa LaTeX entre $ ... $ para todas las fórmulas y números.
+5. Estructura tu respuesta EXACTAMENTE así:
+
+**¿Qué te piden?**
+[1-2 líneas explicando en palabras simples qué calcular]
+
+**Concepto que aplica:**
+[Nombre del concepto y por qué se llama así, 1-2 líneas]
+
+**Resolución paso a paso:**
+1. [paso 1 con cálculo]
+2. [paso 2 con cálculo]
+3. [paso 3 con cálculo]
+...
+
+**Resultado final:** $[respuesta]$
+
+NO escribas más después del resultado. NO dudes. NO te corrijas a ti mismo.`,
     },
     {
       role: 'user',
-      content: `Explícame este problema de pre-cálculo como si tuviera 15 años y nunca lo hubiera visto:
-Problema: ${problem.problem}
-Respuesta correcta: ${problem.answer}
+      content: `Explica este problema y resuélvelo desde cero (no asumas ninguna respuesta dada):
+
+${problem.problem}
+
 Tema: ${problem.topicLabel}`,
     },
   ];
@@ -335,7 +362,12 @@ Tema: ${problem.topicLabel}`,
   const response = await fetch(GROQ_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: GROQ_MODEL, messages, temperature: 0.6, max_tokens: 400 }),
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages,
+      temperature: 0.2, // baja temperatura = menos errores y menos contradicciones
+      max_tokens: 600,
+    }),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const data = await response.json();
