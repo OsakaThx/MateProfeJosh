@@ -15,36 +15,22 @@ function renderLatex(text, displayMode = false) {
 }
 
 /**
- * Pre-process AI-generated text to fix broken LaTeX formatting.
- * Handles newlines inside formulas, orphaned math, etc.
+ * Light pre-processing: only fix LaTeX inside $...$ delimiters.
+ * Does NOT auto-wrap math expressions - that causes double rendering.
  */
 function preprocessMathText(text) {
   if (!text) return '';
   let result = text;
 
-  // Remove newlines that break inline math (AI sometimes puts $...\n...$)
-  // Join lines that are part of the same formula
-  result = result.replace(/\$([^$]+?)\n([^$]+?)\$/g, '$$1$2$');
-
-  // Fix common orphaned patterns from AI: "f\n(\n3\n)" should be wrapped
-  // Pattern: letter, newline, (, number, ), newline, same pattern
-  result = result.replace(/(\w)\s*\n\s*\(\s*\n\s*(\d+)\s*\)\s*\n\s*\1\s*\(\s*\2\s*\)/g, '$$$1($2)$');
-
-  // Fix: "f(x)=8x" on one line then "2" on next (exponent broken)
-  result = result.replace(/(\d+)\s*\n\s*(\d+)/g, '$1$2');
-
-  // Collapse multiple newlines to single space (prevents broken rendering)
-  result = result.replace(/\n\s*\n/g, '\n');
-
-  // Wrap standalone math expressions that aren't in $...$
-  // Pattern: f(3) or x^2 or 2x+1 - but avoid if already inside $ or after \)
-  // Only wrap if it looks like a math expression and isn't already wrapped
-  const mathPattern = /(^|[^\\$\w])([a-zA-Z]+\([^)]+\)|\d+[xX]|\d+\^\d+|[a-zA-Z]\^\d+)([^$]|$)/g;
-  result = result.replace(mathPattern, (match, before, math, after) => {
-    // Don't wrap if it looks like a word or URL
-    if (/^(http|www|pdf|doc|etc)$/i.test(math)) return match;
-    return `${before}$${math}$${after}`;
+  // Only fix newlines INSIDE $...$ delimiters
+  result = result.replace(/\$([^$]+?)\$/g, (match, inner) => {
+    // Remove newlines and excess whitespace inside formulas
+    const cleaned = inner.replace(/\s+/g, ' ').trim();
+    return `$${cleaned}$`;
   });
+
+  // Fix double dollars
+  result = result.replace(/\$\$+/g, '$');
 
   return result;
 }
